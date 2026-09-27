@@ -1,0 +1,20 @@
+Rack Registry
+
+Copyright 2026 Summon Software Labs
+
+Rack Registry is an open-source, vendor-neutral runtime that establishes the
+canonical physical model of racks inside a data center: which racks exist, how
+they are composed, what occupies them, which generation of that composition is
+authoritative, and which claims about it must be rejected as stale.
+
+This product is licensed under the Apache License, Version 2.0. See the
+LICENSE file in this distribution for the full license text.
+
+Rack Registry does not collect or transmit any telemetry. It opens no network
+sockets, performs no name resolution, and contacts no remote service. All state
+it writes is written to local files chosen by the operator and never leaves the
+machine running the software.
+
+Rack Registry accepts contributions from individuals and organizations on the
+terms of the Apache License 2.0 without requiring a Contributor License
+Agreement (CLA). See CONTRIBUTING.md for contribution guidance.
