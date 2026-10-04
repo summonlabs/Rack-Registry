@@ -1,7 +1,7 @@
 # Rack Registry
 
-Rack Registry is the canonical rack-composition runtime of the Data Center
-Control Plane (DCCP), Tranche 1: Canonical Facility State. It answers one
+Rack Registry is the canonical rack-composition runtime.
+It answers one
 question:
 
 > Which racks exist, what occupies them, which generation of that composition is
