@@ -4,6 +4,7 @@
 // Licensed under the Apache License, Version 2.0.
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
@@ -12,6 +13,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "test_framework.hpp"
@@ -85,6 +87,40 @@ std::size_t count_temp_files(const std::filesystem::path& state_file) {
 // ---------------------------------------------------------------------------
 // Opening, publishing and reopening
 // ---------------------------------------------------------------------------
+
+RR_TEST(a_publication_waits_for_a_reader_of_the_state_file) {
+  rrtest::TempDir directory("store-reader");
+  const std::filesystem::path state_file = directory.file("state.rrstate");
+
+  auto store = RackStore::open(rrtest::store_options_for(state_file, "wr:store"));
+  RR_REQUIRE_OK(store);
+  const auto first = store.value()->register_rack(registration_for("store-a", 4));
+  RR_REQUIRE_OK(first);
+  bool reader_opened = false;
+  bool published = false;
+  {
+    // Another tool reading the store (an observer, a backup, a scan) holds the
+    // state file open while the next publication replaces it, and closes it
+    // shortly after.
+    std::ifstream reader(state_file, std::ios::binary);
+    reader_opened = reader.is_open();
+    std::thread writer([&store, &published] {
+      published = store.value()->register_rack(registration_for("store-b", 4)).has_value();
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    reader.close();
+    writer.join();
+  }
+  RR_CHECK(reader_opened);
+  // The replacement waits for the reader instead of failing the publication.
+  RR_CHECK(published);
+  RR_CHECK_EQ(store.value()->sequence().value(), 2u);
+  const auto info = RackStore::inspect(state_file);
+  RR_REQUIRE_OK(info);
+  RR_CHECK_EQ(info.value().sequence.value(), 2u);
+  RR_CHECK_EQ(info.value().rack_count, std::size_t{2});
+  RR_CHECK_EQ(count_temp_files(state_file), std::size_t{0});
+}
 
 RR_TEST(a_fresh_store_starts_empty_and_publishes_generations) {
   rrtest::TempDir directory("store-fresh");

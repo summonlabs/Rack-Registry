@@ -9,11 +9,13 @@
 // across process boundaries.
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "test_framework.hpp"
@@ -46,10 +48,18 @@ void prepare(const std::filesystem::path& state_file) {
 }
 
 std::string read_marker(const std::filesystem::path& path) {
-  std::ifstream stream(path, std::ios::binary);
+  // The child creates the marker and then writes it, so a marker that exists
+  // may still be empty for a moment: it is read until it has content, for a
+  // bounded time (5 s).
   std::string text;
-  if (stream.good()) {
-    std::getline(stream, text);
+  for (int attempt = 0; attempt < 1000 && text.empty(); ++attempt) {
+    if (attempt != 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    std::ifstream stream(path, std::ios::binary);
+    if (stream.good()) {
+      std::getline(stream, text);
+    }
   }
   return text;
 }

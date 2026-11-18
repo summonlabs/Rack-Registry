@@ -63,7 +63,10 @@ function(rr_configure_target target)
 
   if(RR_SANITIZERS)
     if(MSVC)
-      target_compile_options(${target} PRIVATE /fsanitize=address)
+      # Debug information is required: without it MSVC warns C5072 for every
+      # source, which the warnings-as-errors option turns into an error.
+      target_compile_options(${target} PRIVATE /fsanitize=address /Zi)
+      target_link_options(${target} PRIVATE /DEBUG /INCREMENTAL:NO)
     else()
       target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
       target_link_options(${target} PRIVATE -fsanitize=address,undefined)

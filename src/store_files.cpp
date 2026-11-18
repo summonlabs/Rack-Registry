@@ -324,11 +324,28 @@ Status create_file_new_with_data(const std::filesystem::path& path,
 Status replace_file_atomic(const std::filesystem::path& source,
                            const std::filesystem::path& target) {
 #if defined(_WIN32)
-  if (MoveFileExW(source.c_str(), target.c_str(),
-                  MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) == 0) {
-    return io_failure("atomic replace", target, last_error_text());
+  // While a reader has the target open (an observer, a backup, an antivirus or
+  // indexing scan) the replace fails until the reader closes it, so it is
+  // retried for a bounded time (about 2 s). A directory in the way is not
+  // transient and fails at once.
+  for (int attempt = 0;; ++attempt) {
+    if (MoveFileExW(source.c_str(), target.c_str(),
+                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0) {
+      return Status{};
+    }
+    const DWORD code = GetLastError();
+    const DWORD attributes = GetFileAttributesW(target.c_str());
+    const bool directory =
+        attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    const bool transient = (code == ERROR_ACCESS_DENIED || code == ERROR_SHARING_VIOLATION ||
+                            code == ERROR_LOCK_VIOLATION) &&
+                           !directory;
+    if (!transient || attempt >= 100) {
+      SetLastError(code);
+      return io_failure("atomic replace", target, last_error_text());
+    }
+    Sleep(20);
   }
-  return Status{};
 #else
   if (::rename(source.c_str(), target.c_str()) != 0) {
     return io_failure("atomic replace", target, last_error_text());

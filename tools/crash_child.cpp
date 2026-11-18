@@ -77,6 +77,13 @@ int main(int argc, char** argv) {
     if (current == wanted) {
       std::cout << "crashing at " << write_stage_name(current) << std::endl;
       std::cout.flush();
+#if defined(_MSC_VER)
+      // The MSVC runtime reports abort() in a modal dialog in a Debug build and
+      // files a fault report in a Release build. A crash child has nobody to
+      // answer a dialog: both are turned off, and abort() ends the process at
+      // once, without unwinding, with a non-zero exit code.
+      _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#endif
       std::abort();
     }
   };
